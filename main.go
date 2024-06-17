@@ -4,34 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"log"
+	"net/http"
 	"strconv"
 )
-
-type apiConfig struct {
-	fileserverHits int
-}
-
-func (cfg *apiConfig) middlewareMetricsIncr(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileserverHits++
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (cfg *apiConfig) middlewareMetricsReset() {
-	cfg.fileserverHits = 0
-}
 
 func main() {
 	config := new(apiConfig)
 	mux := http.NewServeMux()
 	server := new(http.Server)
 	server.Handler = mux
-	server.Addr = "localhost:8080"
+	port := getPort()
+	server.Addr = "localhost:" + port
 
-	mux.Handle("/app/*",  config.middlewareMetricsIncr(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
+	mux.Handle("/app/*", config.middlewareMetricsIncr(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
@@ -52,7 +38,7 @@ func main() {
 			</html>
 			`, config.fileserverHits)
 		io.WriteString(w, page)
-		
+
 	})
 	mux.HandleFunc("/api/reset", func(w http.ResponseWriter, r *http.Request) {
 		config.middlewareMetricsReset()
@@ -74,21 +60,23 @@ func main() {
 		}
 		if len(params.Body) <= 140 {
 			type returnVals struct {
-				Valid bool `json:"valid"`
+				Valid       bool   `json:"valid"`
+				CleanedBody string `json:"cleaned_body"`
 			}
-		respBody := returnVals{
-				Valid: true,
-		}
-		dat, err := json.Marshal(respBody)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(500)
+			respBody := returnVals{
+				Valid:       true,
+				CleanedBody: cleanProfanity(params.Body),
+			}
+			dat, err := json.Marshal(respBody)
+			if err != nil {
+				log.Printf("Error marshalling JSON: %s", err)
+				w.WriteHeader(500)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			w.Write(dat)
 			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write(dat)
-		return
 		}
 		if len(params.Body) > 140 {
 			type badResponse struct {
@@ -115,4 +103,3 @@ func main() {
 		fmt.Printf("There was an error starting the server: %s", err.Error())
 	}
 }
-
