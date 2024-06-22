@@ -20,13 +20,15 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		// w.Write([]byte(fmt.Sprintf("Hits: %s", strconv.Itoa(config.fileserverHits))))
 		page := fmt.Sprintf(`
 			<html>
 
+			        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
 				<body>
+					<main class="container">
 					<h1>Welcome, Chirpy Admin</h1>
 					<p>Chirpy has been visited %d times!</p>
+					</main>
 				</body>
 
 			</html>
