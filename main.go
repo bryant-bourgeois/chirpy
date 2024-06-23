@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 )
 
 const (
-	dbFile string = "database.json"
+	dbFile     string = "database.json"
+	userDbFile string = "users.json"
 )
 
 func main() {
@@ -20,17 +20,8 @@ func main() {
 	port := getPort()
 	server.Addr = "localhost:" + port
 
-	db, err := os.OpenFile(dbFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		fmt.Printf("Could not open db: %s", err)
-		os.Exit(1)
-	}
-	dbInfo, _ := db.Stat()
-	if dbInfo.Size() <= 0 {
-		db.Close()
-		chirps := ChirpData{Chirps: make(map[int]Chirp)}
-		saveChirps(dbFile, chirps)
-	}
+	bootStrapChirpDb()
+	bootStrapUserDb()
 
 	mux.Handle("/app/*", config.middlewareMetricsIncr(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /api/healthz", healthEndpoint)
@@ -60,9 +51,13 @@ func main() {
 	mux.HandleFunc("/api/validate_chirp", validateChirp)
 	mux.HandleFunc("POST /api/chirps", newChirp)
 	mux.HandleFunc("GET /api/chirps", getChirps)
+	mux.HandleFunc("GET /api/chirps/{chirpId}", getChirpId)
+
+	mux.HandleFunc("POST /api/users", newUser)
+	mux.HandleFunc("POST /api/login", authenticateUser)
 
 	fmt.Printf("Starting server on %s\n", server.Addr)
-	err = server.ListenAndServe()
+	err := server.ListenAndServe()
 	if err != nil {
 		fmt.Printf("There was an error starting the server: %s", err.Error())
 	}

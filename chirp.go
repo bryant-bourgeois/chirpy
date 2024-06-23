@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 type Chirp struct {
@@ -54,6 +56,21 @@ func saveChirps(file string, chirps ChirpData) {
 	if err != nil {
 		fmt.Printf("Problem writing chirps to db: %s\n", err)
 	}
+}
+
+func cleanProfanity(str string) string {
+	badWords := []string{"kerfuffle", "sharbert", "fornax"}
+	lower := strings.ToLower(str)
+	for _, val := range badWords {
+		idx := strings.Index(lower, val)
+		if idx == -1 {
+			continue
+		} else {
+			str = str[:idx] + "****" + str[idx+len(val):]
+			lower = lower[:idx] + "****" + lower[idx+len(val):]
+		}
+	}
+	return str
 }
 
 func newChirp(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +134,32 @@ func getChirps(w http.ResponseWriter, r *http.Request) {
 		return outSlice[i].Id < outSlice[j].Id
 	})
 	data, err := json.Marshal(&outSlice)
+	if err != nil {
+		log.Printf("Error marshalling JSON: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(data)
+}
+
+func getChirpId(w http.ResponseWriter, r *http.Request) {
+	chirps := readChirps(dbFile)
+	idString := r.PathValue("chirpId")
+	id, convErr := strconv.Atoi(idString)
+	if convErr != nil {
+		log.Printf("Bad value passed to path: %s", convErr)
+		w.WriteHeader(500)
+		return
+	}
+	chirp, ok := chirps.Chirps[id]
+	if !ok {
+		w.WriteHeader(404)
+		return
+	}
+
+	data, err := json.Marshal(&chirp)
 	if err != nil {
 		log.Printf("Error marshalling JSON: %s", err)
 		w.WriteHeader(500)
