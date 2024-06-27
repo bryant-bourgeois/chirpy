@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -13,7 +16,13 @@ const (
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	config := new(apiConfig)
+
 	mux := http.NewServeMux()
 	server := new(http.Server)
 	server.Handler = mux
@@ -48,7 +57,6 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(fmt.Sprintf("Hits: %s", strconv.Itoa(config.fileserverHits))))
 	})
-	mux.HandleFunc("/api/validate_chirp", validateChirp)
 	mux.HandleFunc("POST /api/chirps", newChirp)
 	mux.HandleFunc("GET /api/chirps", getChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpId}", getChirpId)
@@ -57,7 +65,7 @@ func main() {
 	mux.HandleFunc("POST /api/login", authenticateUser)
 
 	fmt.Printf("Starting server on %s\n", server.Addr)
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil {
 		fmt.Printf("There was an error starting the server: %s", err.Error())
 	}

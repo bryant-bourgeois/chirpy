@@ -4,18 +4,28 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
 	Id           int    `json:"id"`
 	Email        string `json:"email"`
 	PasswordHash []byte `json:"password"`
+}
+
+type UserAuth struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+	Token string `json:"token"`
 }
 
 type UserInfo struct {
@@ -141,10 +151,30 @@ func newUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func produceJWT(expiry, uid int) (string, error) {
+	secret := os.Getenv("JWT_SECRET")
+
+	now := time.Now().UTC()
+	claims := jwt.RegisteredClaims{
+		Issuer:    "chirpy",
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(expiry) * time.Second)),
+		Subject:   strconv.Itoa(uid),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		fmt.Printf("There was an error signing JWT: %s\n", err)
+		return "", err
+	}
+	return tokenString, nil
+}
+
 func authenticateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		Expiry   int    `json:"expires_in_seconds"`
 	}
 	params := parameters{}
 	decoder := json.NewDecoder(r.Body)
@@ -172,9 +202,22 @@ func authenticateUser(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("User does not exist or password was incorrect: 401 Unauthorized"))
 		return
 	}
-	userInfo := UserInfo{
+	token := ""
+	if params.Expiry == 0 {
+		token, err = produceJWT(86400, storedUserData.Id)
+		if err != nil {
+			fmt.Printf("Something is wrong with creating JWT for login request: %s\n", err)
+		}
+	} else {
+		token, err = produceJWT(params.Expiry, storedUserData.Id)
+		if err != nil {
+			fmt.Printf("Something is wrong with creating JWT for login request: %s\n", err)
+		}
+	}
+	userInfo := UserAuth{
 		Id:    storedUserData.Id,
 		Email: storedUserData.Email,
+		Token: token,
 	}
 	data, marshallErr := json.Marshal(userInfo)
 	if marshallErr != nil {
