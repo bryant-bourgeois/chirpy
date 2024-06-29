@@ -230,3 +230,91 @@ func authenticateUser(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 	return
 }
+
+func updateUser(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	header := r.Header.Get("authorization")
+	if header == "" {
+		out := "Request wasn't made with header 'Authorization: Bearer <my_auth_token>'"
+		w.Write([]byte(out))
+		w.WriteHeader(400)
+		return
+	}
+	bearerToken := strings.Replace(header, "Bearer ", "", 1)
+	secret := os.Getenv("JWT_SECRET")
+	claims := &jwt.RegisteredClaims{}
+	parsedToken, err := jwt.ParseWithClaims(bearerToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+	if err != nil {
+		fmt.Printf("Error parsing claims from received token: %s\n", err)
+		w.WriteHeader(401)
+		return
+	}
+	issuer, err := parsedToken.Claims.GetIssuer()
+	if err != nil {
+		fmt.Printf("There was an error reading issuer from parsed token claims: %s\n", err)
+	}
+	if issuer != "chirpy" {
+		fmt.Println("Parsed a JWT that we did not issue")
+		w.WriteHeader(401)
+		return
+	}
+	uid, err := parsedToken.Claims.GetSubject()
+	users := readUsers(userDbFile)
+	for _, val := range users.Users {
+		if params.Email == val.Email {
+			w.Write([]byte("Email address is already in use"))
+			w.WriteHeader(400)
+			return
+		}
+	}
+	uidInt, err := strconv.Atoi(uid)
+	if err != nil {
+		fmt.Printf("There was an error converting token parsed user id to a number: %s\n", err)
+		w.WriteHeader(401)
+		return
+	}
+	updatedUser, ok := users.Users[uidInt]
+	if !ok {
+		fmt.Println("Targeted user no longer exists!")
+		w.WriteHeader(401)
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(params.Password), 2)
+	if err != nil {
+		fmt.Printf("There was an error generating a password hash: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+	updatedUser.Email = params.Email
+	updatedUser.PasswordHash = hash
+	users.Users[uidInt] = updatedUser
+	saveUsers(userDbFile, users)
+	user := UserInfo{
+		Id:    uidInt,
+		Email: updatedUser.Email,
+	}
+	data, err := json.Marshal(&user)
+	if err != nil {
+		fmt.Printf("There was an error marshalling updated user to JSON: %s\n", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.Write(data)
+	w.WriteHeader(200)
+	return
+
+}

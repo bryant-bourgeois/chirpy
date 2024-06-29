@@ -62,6 +62,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps/{chirpId}", getChirpId)
 
 	mux.HandleFunc("POST /api/users", newUser)
+	mux.HandleFunc("PUT /api/users", updateUser)
 	mux.HandleFunc("POST /api/login", authenticateUser)
 
 	fmt.Printf("Starting server on %s\n", server.Addr)
