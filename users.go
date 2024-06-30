@@ -23,9 +23,10 @@ type User struct {
 }
 
 type UserAuth struct {
-	Id    int    `json:"id"`
-	Email string `json:"email"`
-	Token string `json:"token"`
+	Id           int    `json:"id"`
+	Email        string `json:"email"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type UserInfo struct {
@@ -214,10 +215,20 @@ func authenticateUser(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Something is wrong with creating JWT for login request: %s\n", err)
 		}
 	}
+	refreshToken := newToken()
+	tokens := readTokens(refreshTokenDbFile)
+	tokens.Tokens[storedUserData.Id] = RefreshToken{
+		UserId:        storedUserData.Id,
+		Token:         refreshToken,
+		ExirationDate: time.Now().UTC().AddDate(0, 0, 60),
+	}
+	saveTokens(refreshTokenDbFile, tokens)
+
 	userInfo := UserAuth{
-		Id:    storedUserData.Id,
-		Email: storedUserData.Email,
-		Token: token,
+		Id:           storedUserData.Id,
+		Email:        storedUserData.Email,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}
 	data, marshallErr := json.Marshal(userInfo)
 	if marshallErr != nil {
@@ -316,5 +327,4 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 	w.WriteHeader(200)
 	return
-
 }

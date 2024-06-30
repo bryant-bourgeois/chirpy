@@ -1,4 +1,5 @@
 database.json
 users.json
-.env
+refreshTokens.json
 userUpdate.sh
+.env

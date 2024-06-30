@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	dbFile     string = "database.json"
-	userDbFile string = "users.json"
+	dbFile             string = "database.json"
+	userDbFile         string = "users.json"
+	refreshTokenDbFile string = "refreshTokens.json"
 )
 
 func main() {
@@ -31,6 +32,7 @@ func main() {
 
 	bootStrapChirpDb()
 	bootStrapUserDb()
+	bootStrapRefreshTokenDb()
 
 	mux.Handle("/app/*", config.middlewareMetricsIncr(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /api/healthz", healthEndpoint)
