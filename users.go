@@ -215,7 +215,7 @@ func authenticateUser(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Something is wrong with creating JWT for login request: %s\n", err)
 		}
 	}
-	refreshToken := newToken()
+	refreshToken := newRefreshToken()
 	tokens := readTokens(refreshTokenDbFile)
 	tokens.Tokens[storedUserData.Id] = RefreshToken{
 		UserId:        storedUserData.Id,
@@ -284,12 +284,17 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	uid, err := parsedToken.Claims.GetSubject()
 	users := readUsers(userDbFile)
-	for _, val := range users.Users {
-		if params.Email == val.Email {
-			w.Write([]byte("Email address is already in use"))
-			w.WriteHeader(400)
-			return
-		}
+	if duplicateUserCheck(users, params.Email) {
+		out := fmt.Sprintf("Email address %s is already in use\n", params.Email)
+		w.Write([]byte(out))
+		w.WriteHeader(400)
+		return
+	}
+	if !validateEmail(params.Email) {
+		out := fmt.Sprintf("%s is not a valid email address\n", params.Email)
+		w.Write([]byte(out))
+		w.WriteHeader(400)
+		return
 	}
 	uidInt, err := strconv.Atoi(uid)
 	if err != nil {

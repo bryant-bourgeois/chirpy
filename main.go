@@ -67,6 +67,9 @@ func main() {
 	mux.HandleFunc("PUT /api/users", updateUser)
 	mux.HandleFunc("POST /api/login", authenticateUser)
 
+	mux.HandleFunc("POST /api/refresh", refreshUserAuth)
+	mux.HandleFunc("POST /api/revoke", revokeUserAuth)
+
 	fmt.Printf("Starting server on %s\n", server.Addr)
 	err = server.ListenAndServe()
 	if err != nil {

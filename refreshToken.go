@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -57,7 +59,7 @@ func readTokens(file string) RefreshTokens {
 	return tokens
 }
 
-func newToken() string {
+func newRefreshToken() string {
 	bytes := 32
 	b := make([]byte, bytes)
 	_, err := rand.Read(b)
@@ -66,4 +68,59 @@ func newToken() string {
 	}
 	encoded := hex.EncodeToString(b)
 	return encoded
+}
+
+func refreshUserAuth(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("authorization")
+	if header == "" {
+		out := "Request wasn't made with header 'Authorization: Bearer <my_auth_token>'"
+		w.Write([]byte(out))
+		w.WriteHeader(400)
+		return
+	}
+	bearerToken := strings.Replace(header, "Bearer ", "", 1)
+	refreshTokens := readTokens(refreshTokenDbFile)
+	tokenExists := false
+	tokenValid := false
+	targetToken := RefreshToken{}
+
+	for _, val := range refreshTokens.Tokens {
+		if val.Token == bearerToken {
+			targetToken = val
+			tokenExists = true
+			if val.ExirationDate.After(time.Now().UTC()) {
+				tokenValid = true
+			}
+			break
+		}
+	}
+
+	if !tokenExists || !tokenValid {
+		w.WriteHeader(401)
+		return
+	}
+
+	type parameters struct {
+		Token string `json:"token"`
+	}
+	authToken, err := produceJWT(3600, targetToken.UserId)
+	if err != nil {
+		fmt.Printf("Error creating JWT with supplied parameters: %s\n", err)
+	}
+
+	responseData := parameters{
+		Token: authToken,
+	}
+
+	data, err := json.Marshal(&responseData)
+	if err != nil {
+		fmt.Printf("Error marshalling JWT response to JSON: %s\n", err)
+	}
+
+	w.Write(data)
+	w.WriteHeader(200)
+	return
+}
+
+func revokeUserAuth(w http.ResponseWriter, r *http.Request) {
 }
