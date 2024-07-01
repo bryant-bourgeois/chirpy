@@ -23,6 +23,9 @@ type RefreshTokens struct {
 }
 
 func saveTokens(file string, tokens RefreshTokens) {
+	if err := os.Truncate(file, 0); err != nil {
+		fmt.Printf("Failed to truncate: %v", err)
+	}
 	db, err := os.OpenFile(file, os.O_WRONLY, 0666)
 	if err != nil {
 		fmt.Printf("There was an error opening DB for reading: %s\n", err)
@@ -123,4 +126,25 @@ func refreshUserAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func revokeUserAuth(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("authorization")
+	if header == "" {
+		out := "Request wasn't made with header 'Authorization: Bearer <my_auth_token>'"
+		w.Write([]byte(out))
+		w.WriteHeader(400)
+		return
+	}
+	bearerToken := strings.Replace(header, "Bearer ", "", 1)
+	refreshTokens := readTokens(refreshTokenDbFile)
+
+	for id, val := range refreshTokens.Tokens {
+		if val.Token == bearerToken {
+			delete(refreshTokens.Tokens, id)
+			fmt.Println(refreshTokens)
+			saveTokens(refreshTokenDbFile, refreshTokens)
+			w.WriteHeader(204)
+			return
+		}
+	}
+	w.WriteHeader(404)
+	return
 }

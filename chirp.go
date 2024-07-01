@@ -42,6 +42,9 @@ func readChirps(file string) ChirpData {
 }
 
 func saveChirps(file string, chirps ChirpData) {
+	if err := os.Truncate(file, 0); err != nil {
+		fmt.Printf("Failed to truncate: %v", err)
+	}
 	db, err := os.OpenFile(file, os.O_WRONLY, 0666)
 	if err != nil {
 		fmt.Printf("There was an error opening DB for reading: %s\n", err)
