@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"net/http"
 	"os"
@@ -13,8 +14,9 @@ import (
 )
 
 type Chirp struct {
-	Id   int    `json:"id"`
-	Body string `json:"body"`
+	Id       int    `json:"id"`
+	Body     string `json:"body"`
+	AuthorId int    `json:"author_id"`
 }
 
 type ChirpData struct {
@@ -77,13 +79,45 @@ func cleanProfanity(str string) string {
 }
 
 func newChirp(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("authorization")
+	if header == "" {
+		out := "Request wasn't made with header 'Authorization: Bearer <my_auth_token>'"
+		w.Write([]byte(out))
+		w.WriteHeader(400)
+		return
+	}
+	bearerToken := strings.Replace(header, "Bearer ", "", 1)
+	secret := os.Getenv("JWT_SECRET")
+	claims := &jwt.RegisteredClaims{}
+	parsedToken, err := jwt.ParseWithClaims(bearerToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+	if err != nil {
+		fmt.Printf("Error parsing claims from received token: %s\n", err)
+		w.WriteHeader(401)
+		return
+	}
+	issuer, err := parsedToken.Claims.GetIssuer()
+	if err != nil {
+		fmt.Printf("There was an error reading issuer from parsed token claims: %s\n", err)
+	}
+	if issuer != "chirpy" {
+		fmt.Println("Parsed a JWT that we did not issue")
+		w.WriteHeader(401)
+		return
+	}
+	uid, err := parsedToken.Claims.GetSubject()
+	uidInt, err := strconv.Atoi(uid)
+	if err != nil {
+		fmt.Printf("Failed to convert user id string to int: %s\n", err)
+	}
 
 	type parameters struct {
 		Body string `json:"body"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %s", err)
 		w.WriteHeader(500)
@@ -92,8 +126,9 @@ func newChirp(w http.ResponseWriter, r *http.Request) {
 	if len(params.Body) <= 140 {
 		chirps := readChirps(dbFile)
 		chirp := Chirp{
-			Id:   (len(chirps.Chirps) + 1),
-			Body: cleanProfanity(params.Body),
+			Id:       (len(chirps.Chirps) + 1),
+			Body:     cleanProfanity(params.Body),
+			AuthorId: uidInt,
 		}
 		chirps.Chirps[chirp.Id] = chirp
 		saveChirps(dbFile, chirps)
