@@ -62,6 +62,7 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", newChirp)
 	mux.HandleFunc("GET /api/chirps", getChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpId}", getChirpId)
+	mux.HandleFunc("DELETE /api/chirps/{chirpId}", deleteChirp)
 
 	mux.HandleFunc("POST /api/users", newUser)
 	mux.HandleFunc("PUT /api/users", updateUser)
@@ -69,6 +70,8 @@ func main() {
 
 	mux.HandleFunc("POST /api/refresh", refreshUserAuth)
 	mux.HandleFunc("POST /api/revoke", revokeUserAuth)
+
+	mux.HandleFunc("POST /api/polka/webhooks", userUpgrade)
 
 	fmt.Printf("Starting server on %s\n", server.Addr)
 	err = server.ListenAndServe()

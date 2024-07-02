@@ -20,6 +20,7 @@ type User struct {
 	Id           int    `json:"id"`
 	Email        string `json:"email"`
 	PasswordHash []byte `json:"password"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 type UserAuth struct {
@@ -27,11 +28,13 @@ type UserAuth struct {
 	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 type UserInfo struct {
-	Id    int    `json:"id"`
-	Email string `json:"email"`
+	Id          int    `json:"id"`
+	Email       string `json:"email"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 type UserData struct {
@@ -59,6 +62,9 @@ func readUsers(file string) UserData {
 }
 
 func saveUsers(file string, users UserData) {
+	if err := os.Truncate(file, 0); err != nil {
+		fmt.Printf("Failed to truncate: %v", err)
+	}
 	db, err := os.OpenFile(file, os.O_WRONLY, 0666)
 	if err != nil {
 		fmt.Printf("There was an error opening DB for reading: %s\n", err)
@@ -132,6 +138,7 @@ func newUser(w http.ResponseWriter, r *http.Request) {
 			Id:           (len(users.Users) + 1),
 			Email:        params.Email,
 			PasswordHash: hash,
+			IsChirpyRed:  false,
 		}
 		userResp := UserInfo{
 			Id:    (len(users.Users) + 1),
@@ -227,6 +234,7 @@ func authenticateUser(w http.ResponseWriter, r *http.Request) {
 	userInfo := UserAuth{
 		Id:           storedUserData.Id,
 		Email:        storedUserData.Email,
+		IsChirpyRed:  storedUserData.IsChirpyRed,
 		Token:        token,
 		RefreshToken: refreshToken,
 	}
