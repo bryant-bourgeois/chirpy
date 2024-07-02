@@ -163,14 +163,40 @@ func newChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func getChirps(w http.ResponseWriter, r *http.Request) {
+	targetAuthor := r.URL.Query().Get("author_id")
+	sortingOrder := r.URL.Query().Get("sort")
 	chirps := readChirps(dbFile)
 	outSlice := []Chirp{}
-	for _, val := range chirps.Chirps {
-		outSlice = append(outSlice, val)
+	targetAutorInt, err := strconv.Atoi(targetAuthor)
+	authorIdPassed := true
+	if err != nil {
+		authorIdPassed = false
+		fmt.Printf("There was an error converting author_id query param value to an int, or one was not supplied: %s\n", err)
 	}
-	sort.Slice(outSlice, func(i, j int) bool {
-		return outSlice[i].Id < outSlice[j].Id
-	})
+	if !authorIdPassed {
+		for _, val := range chirps.Chirps {
+			outSlice = append(outSlice, val)
+		}
+	}
+
+	if authorIdPassed {
+		for _, val := range chirps.Chirps {
+			if val.AuthorId == targetAutorInt {
+				outSlice = append(outSlice, val)
+			}
+		}
+	}
+
+	if sortingOrder == "desc" {
+		sort.Slice(outSlice, func(i, j int) bool {
+			return outSlice[i].Id > outSlice[j].Id
+		})
+	} else {
+		sort.Slice(outSlice, func(i, j int) bool {
+			return outSlice[i].Id < outSlice[j].Id
+		})
+	}
+
 	data, err := json.Marshal(&outSlice)
 	if err != nil {
 		log.Printf("Error marshalling JSON: %s", err)
