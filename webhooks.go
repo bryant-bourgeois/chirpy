@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 type PolkaEvent struct {
@@ -15,6 +16,19 @@ type PolkaEvent struct {
 }
 
 func userUpgrade(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("authorization")
+	if header == "" {
+		w.WriteHeader(401)
+		return
+	}
+	apiKey := strings.Replace(header, "ApiKey ", "", 1)
+	storedApiKey := os.Getenv("POLKA_KEY")
+
+	if apiKey != storedApiKey {
+		w.WriteHeader(401)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := PolkaEvent{}
 	err := decoder.Decode(&params)
@@ -40,7 +54,6 @@ func userUpgrade(w http.ResponseWriter, r *http.Request) {
 			userFound = true
 		}
 	}
-	fmt.Println(targetUser)
 
 	if !userFound {
 		w.WriteHeader(404)
